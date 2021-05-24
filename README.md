@@ -792,6 +792,36 @@ $ cd ~/ctf01d.git/game-simulation/
 $ ./ctf01d-assistent.py clean
 ```
 
+# FOR MAINTAINERS
+
+/etc/systemd/system/ctf01d.service
+```
+[Unit]
+Description=CTF01D
+After=syslog.target
+After=network.target
+After=mysql.service
+Requires=mysql.service
+
+[Service]
+WorkingDirectory=/root
+User=root
+Group=root
+ExecStart=/bin/sh -c '/usr/bin/ctf01d start -s > /var/log/ctf01d/access.log 2> /var/log/ctf01d/error.log'
+
+TimeoutSec=30
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+Alias=ctf01d.service
+```
+and start it:
+```
+$ sudo chmod 644 /etc/systemd/system/ctf01d.service
+$ sudo systemctl restart myservice
+```
+
 # SPECIAL THANKS
 
 * Danil Dudkin
