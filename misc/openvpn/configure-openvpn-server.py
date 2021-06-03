@@ -4,9 +4,12 @@
 import os
 import sys
 import subprocess
+import shutil
 
-OS=''
-VERSION_ID=''
+OS = ''
+VERSION_ID = ''
+AUTO_INSTALL = 'n'
+CURRENT_PATH = os.getcwd()
 print("Redevelop from a shell script https://github.com/angristan/openvpn-install")
 
 def call_command(commands):
@@ -1176,34 +1179,50 @@ function newClient() {
 """
 
 def revokeClient():
+    pki_index_path = "/etc/openvpn/easy-rsa/pki/index.txt"
+    NUMBEROFCLIENTS = 0
+    CLIENTS=[]
+    with open(pki_index_path, mode='r') as os_release:
+        lines = os_release.read()
+        lines = lines.split("\n")
+        idx = 0
+        for line in lines:
+            idx += 1
+            if idx == 1:
+                continue
+            if line.startswith("V"):
+                NUMBEROFCLIENTS += 1
+                CLIENTS.append(line.split('=')[1].strip())
+    if NUMBEROFCLIENTS == 0:
+        print("")
+        print("You have no existing clients!")
+        sys.exit(1)
+  
+    print("")
+    print("Select the existing client certificate you want to revoke")
+    idx = 0
+    for cl in CLIENTS:
+        idx += 1
+        print("   " + str(idx) + ") " + cl)
+    CLIENTNUMBER = 0
+    while CLIENTNUMBER < 1 or CLIENTNUMBER > NUMBEROFCLIENTS:
+        print("Select one client [1-" + str(NUMBEROFCLIENTS) + "]", end='')
+        CLIENTNUMBER = int(input())
+    
+    CLIENT = CLIENTS[CLIENTNUMBER-1]
+
+    os.chdir("/etc/openvpn/easy-rsa/")
+    os.system("./easyrsa --batch revoke '" + CLIENT + "'")
+    os.system("EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl")
+    os.remove("/etc/openvpn/crl.pem")
+    shutil.copyfile("/etc/openvpn/easy-rsa/pki/crl.pem", "/etc/openvpn/crl.pem")
+    os.system("chmod 644 /etc/openvpn/crl.pem")
+    os.chdir(CURRENT_PATH)
+    os.remove(CLIENT + ".ovpn")
     # TODO
-    # NUMBEROFCLIENTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep -c "^V")
-    # if [[ $NUMBEROFCLIENTS == '0' ]]; then
-    #     print("")
-    #     print("You have no existing clients!")
-    #     sys.exit(1)
-    # echo ""
-    # echo "Select the existing client certificate you want to revoke"
-    # tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | nl -s ') '
-    # until [[ $CLIENTNUMBER -ge 1 && $CLIENTNUMBER -le $NUMBEROFCLIENTS ]]; do
-    #     if [[ $CLIENTNUMBER == '1' ]]; then
-    #         read -rp "Select one client [1]: " CLIENTNUMBER
-    #     else
-    #         read -rp "Select one client [1-$NUMBEROFCLIENTS]: " CLIENTNUMBER
-    #     fi
-    # done
-    # CLIENT=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | sed -n "$CLIENTNUMBER"p)
-    # cd /etc/openvpn/easy-rsa/ || return
-    # ./easyrsa --batch revoke "$CLIENT"
-    # EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
-    # rm -f /etc/openvpn/crl.pem
-    # cp /etc/openvpn/easy-rsa/pki/crl.pem /etc/openvpn/crl.pem
-    # chmod 644 /etc/openvpn/crl.pem
-    # find /home/ -maxdepth 2 -name "$CLIENT.ovpn" -delete
-    # rm -f "/root/$CLIENT.ovpn"
     # sed -i "/^$CLIENT,.*/d" /etc/openvpn/ipp.txt
     print("")
-    print("Certificate for client $CLIENT revoked.")
+    print("Certificate for client " + CLIENT + " revoked.")
 
 def removeUnbound():
     # Remove OpenVPN-related config
